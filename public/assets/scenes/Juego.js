@@ -54,11 +54,11 @@ export default class Juego extends Phaser.Scene {
 
     this.enemyCount = 0;
     this.enemyTimer = this.time.addEvent({ delay: 10000, callback: this.spawnEnemy, callbackScope: this, repeat: 9 });
-
+    this.time.addEvent({ delay: 5000, callback: this.spawnAsteroid, callbackScope: this, loop: true });
     this.time.addEvent({ delay: 5000, callback: this.enemyShoot, callbackScope: this, loop: true });
 
     this.physics.add.collider(this.bullets, this.enemies, this.hitEnemy, this.checkPlayerBulletCollision, this);
-    this.physics.add.collider(this.bullets, this.asteroids, this.hitAsteroid, null, this);
+    this.physics.add.collider(this.bullets, this.asteroids, this.hitAsteroid, this.checkPlayerBulletCollision, this);
     this.physics.add.collider(this.enemies, this.sprite, this.hitEnemyPlayer, null, this);
     this.physics.add.collider(this.asteroids, this.sprite, this.hitAsteroidPlayer, null, this);
     this.physics.add.collider(this.sprite, this.bullets, this.hitPlayerBullet, this.checkEnemyBulletCollision, this);
@@ -106,6 +106,12 @@ export default class Juego extends Phaser.Scene {
     }
   }
 
+  spawnAsteroid() {
+    const asteroid = this.physics.add.sprite(Phaser.Math.Between(100, 700), Phaser.Math.Between(100, 500), 'asteroid');
+    this.asteroids.add(asteroid);
+    this.physics.velocityFromRotation(Phaser.Math.FloatBetween(0, Math.PI * 2), 100, asteroid.body.velocity);
+  }
+
   enemyMove(enemy) {
     this.physics.velocityFromRotation(enemy.rotation, 100, enemy.body.velocity);
   }
@@ -130,7 +136,7 @@ export default class Juego extends Phaser.Scene {
     bullet.disableBody(true, true);
     enemy.disableBody(true, true);
     enemy.setData('isDestroyed', true);
-    this.enemyCount++;
+    this.enemyCount--;
     this.points += 50;
     this.pointsText.setText(`Points: ${this.points}`);
 
@@ -186,15 +192,9 @@ export default class Juego extends Phaser.Scene {
 
   playerDestroyed() {
     this.sprite.disableBody(true, true);
-    this.livesText.setText('Game Over');
-    this.time.addEvent({ delay: 3000, callback: this.restartGame, callbackScope: this });
-  }
-
-  restartGame() {
-    this.scene.restart();
+    this.sprite.setPosition(400, 300);
+    this.lives = 3;
+    this.livesText.setText(`Lives: ${this.lives}`);
   }
 }
-
-
-
 
