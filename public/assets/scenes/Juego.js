@@ -5,10 +5,6 @@ export default class Juego extends Phaser.Scene {
     super("hello-world");
   }
 
-  init() {
-    // ...
-  }
-
   text;
   cursors;
   sprite;
@@ -23,13 +19,15 @@ export default class Juego extends Phaser.Scene {
   spaceKey;
   asteroids;
   activeEnemiesText;
+  gameOverText;
+  restartText;
 
   preload() {
     this.load.image('mybullet', 'public/assets/images/mybullet.png');
     this.load.image('enemybullet', 'public/assets/images/enemybullet.png');
     this.load.image('ship', 'public/assets/images/ship.png');
     this.load.image('enemy', 'public/assets/images/enemy.png');
-    this.load.image('asteroid', 'assets/games/asteroids/asteroid.png');
+    this.load.image('asteroid', 'public/assets/images/asteroid.png');
   }
 
   create() {
@@ -64,52 +62,96 @@ export default class Juego extends Phaser.Scene {
     this.physics.add.collider(this.sprite, this.bullets, this.hitPlayerBullet, this.checkEnemyBulletCollision, this);
 
     this.physics.world.setBoundsCollision(true, true, true, true);
+
+    this.gameOverText = this.add.text(400, 300, 'Game Over', { font: '48px Arial', fill: '#ff0000', align: 'center' });
+    this.gameOverText.setOrigin(0.5);
+    this.gameOverText.setVisible(false);
+
+    this.restartText = this.add.text(400, 400, 'Press R to Restart', { font: '24px Arial', fill: '#ffffff', align: 'center' });
+    this.restartText.setOrigin(0.5);
+    this.restartText.setVisible(false);
+
+    this.input.keyboard.on('keydown-R', () => {
+      this.scene.restart();
+    });
   }
 
   update() {
-    if (this.cursors.up.isDown) {
-      this.physics.velocityFromRotation(this.sprite.rotation, 200, this.sprite.body.acceleration);
-    } else {
-      this.sprite.setAcceleration(0);
-    }
+    if (!this.sprite.getData('isDestroyed')) {
+      if (this.cursors.up.isDown) {
+        this.physics.velocityFromRotation(this.sprite.rotation, 200, this.sprite.body.acceleration);
+      } else {
+        this.sprite.setAcceleration(0);
+      }
 
-    if (this.cursors.left.isDown) {
-      this.sprite.setAngularVelocity(-300);
-    } else if (this.cursors.right.isDown) {
-      this.sprite.setAngularVelocity(300);
-    } else {
-      this.sprite.setAngularVelocity(0);
-    }
+      if (this.cursors.left.isDown) {
+        this.sprite.setAngularVelocity(-300);
+      } else if (this.cursors.right.isDown) {
+        this.sprite.setAngularVelocity(300);
+      } else {
+        this.sprite.setAngularVelocity(0);
+      }
 
-    this.text.setText(`Speed: ${this.sprite.body.speed}`);
+      this.text.setText(`Speed: ${this.sprite.body.speed}`);
 
-    this.physics.world.wrap(this.sprite, 32);
+      this.physics.world.wrap(this.sprite, 32);
 
-    this.enemies.children.each((enemy) => {
-      this.enemyMove(enemy);
-      this.physics.world.wrap(enemy, 16);
-    });
+      this.enemies.children.each((enemy) => {
+        this.enemyMove(enemy);
+        this.physics.world.wrap(enemy, 16);
+      });
 
-    if (Phaser.Input.Keyboard.JustDown(this.spaceKey)) {
-      this.playerShoot();
+      if (Phaser.Input.Keyboard.JustDown(this.spaceKey)) {
+        this.playerShoot();
+      }
     }
   }
 
   spawnEnemy() {
-    if (this.enemyCount < 10) {
-      const enemy = this.physics.add.sprite(Phaser.Math.Between(100, 700), Phaser.Math.Between(100, 500), 'enemy');
+    if (!this.gameOverText.visible && this.enemyCount < 10) {
+      const enemy = this.physics.add.sprite(Phaser.Math.Between(100, 700), -20, 'enemy');
       this.enemies.add(enemy);
       this.enemyCount++;
 
       const randomAngle = Phaser.Math.FloatBetween(-Math.PI, Math.PI);
       enemy.rotation = randomAngle;
+
+      this.time.addEvent({
+        delay: Phaser.Math.Between(2000, 4000),
+        callback: () => {
+          enemy.setVelocityY(100);
+        },
+        callbackScope: this
+      });
     }
   }
 
   spawnAsteroid() {
-    const asteroid = this.physics.add.sprite(Phaser.Math.Between(100, 700), Phaser.Math.Between(100, 500), 'asteroid');
-    this.asteroids.add(asteroid);
-    this.physics.velocityFromRotation(Phaser.Math.FloatBetween(0, Math.PI * 2), 100, asteroid.body.velocity);
+    if (!this.gameOverText.visible) {
+      const x = Math.random() < 0.5 ? -20 : 820;
+      const y = Phaser.Math.Between(100, 500);
+      const asteroid = this.physics.add.sprite(x, y, 'asteroid');
+      this.asteroids.add(asteroid);
+
+      const velocity = Phaser.Math.Between(50, 150);
+      if (x === -20) {
+        asteroid.setVelocityX(velocity);
+      } else {
+        asteroid.setVelocityX(-velocity);
+      }
+
+      this.time.addEvent({
+        delay: Phaser.Math.Between(2000, 4000),
+        callback: () => {
+          if (x === -20) {
+            asteroid.setVelocityX(velocity);
+          } else {
+            asteroid.setVelocityX(-velocity);
+          }
+        },
+        callbackScope: this
+      });
+    }
   }
 
   enemyMove(enemy) {
@@ -127,74 +169,102 @@ export default class Juego extends Phaser.Scene {
   }
 
   playerShoot() {
-    const bullet = this.bullets.create(this.sprite.x, this.sprite.y, 'mybullet');
-    bullet.rotation = this.sprite.rotation;
-    this.physics.velocityFromRotation(bullet.rotation, 200, bullet.body.velocity);
+    if (!this.gameOverText.visible) {
+      const bullet = this.bullets.create(this.sprite.x, this.sprite.y, 'mybullet');
+      bullet.rotation = this.sprite.rotation;
+      this.physics.velocityFromRotation(bullet.rotation, 200, bullet.body.velocity);
+      bullet.setData('isPlayerBullet', true); // Asignar la propiedad 'isPlayerBullet' a true
+    }
   }
 
   hitEnemy(bullet, enemy) {
     bullet.disableBody(true, true);
     enemy.disableBody(true, true);
-    enemy.setData('isDestroyed', true);
     this.enemyCount--;
-    this.points += 50;
+    this.points += 10;
     this.pointsText.setText(`Points: ${this.points}`);
+  }
 
-    if (this.enemyCount === 0) {
-      this.enemyTimer.paused = true;
-    }
+  hitAsteroid(bullet, asteroid) {
+    bullet.disableBody(true, true);
+    asteroid.disableBody(true, true);
+    this.points += 5;
+    this.pointsText.setText(`Points: ${this.points}`);
   }
 
   hitEnemyPlayer(player, enemy) {
-    enemy.disableBody(true, true);
-    this.lives--;
-    this.livesText.setText(`Lives: ${this.lives}`);
+    if (!player.getData('isDestroyed')) {
+      enemy.disableBody(true, true);
+      player.setData('isDestroyed', true);
+      player.disableBody(true, true);
+      this.lives--;
+      this.livesText.setText(`Lives: ${this.lives}`);
 
-    if (this.lives <= 0) {
-      this.playerDestroyed();
+      if (this.lives === 0) {
+        this.gameOver();
+      } else {
+        this.time.delayedCall(1000, this.resetPlayer, [], this);
+      }
     }
   }
 
-  hitAsteroid(asteroid, bullet) {
-    bullet.disableBody(true, true);
-    asteroid.disableBody(true, true);
-    this.points += 20;
-    this.pointsText.setText(`Points: ${this.points}`);
-  }
+  hitAsteroidPlayer(player, asteroid) {
+    if (!player.getData('isDestroyed')) {
+      asteroid.disableBody(true, true);
+      player.setData('isDestroyed', true);
+      player.disableBody(true, true);
+      this.lives--;
+      this.livesText.setText(`Lives: ${this.lives}`);
 
-  hitAsteroidPlayer(asteroid, player) {
-    asteroid.disableBody(true, true);
-    this.lives--;
-    this.livesText.setText(`Lives: ${this.lives}`);
-
-    if (this.lives <= 0) {
-      this.playerDestroyed();
+      if (this.lives === 0) {
+        this.gameOver();
+      } else {
+        this.time.delayedCall(1000, this.resetPlayer, [], this);
+      }
     }
   }
 
   hitPlayerBullet(player, bullet) {
-    bullet.disableBody(true, true);
-    this.lives--;
-    this.livesText.setText(`Lives: ${this.lives}`);
+    if (!player.getData('isDestroyed') && !bullet.getData('isPlayerBullet')) { // Comprobar que la bala no sea del jugador
+      bullet.disableBody(true, true);
+      player.setData('isDestroyed', true);
+      player.disableBody(true, true);
+      this.lives--;
+      this.livesText.setText(`Lives: ${this.lives}`);
 
-    if (this.lives <= 0) {
-      this.playerDestroyed();
+      if (this.lives === 0) {
+        this.gameOver();
+      } else {
+        this.time.delayedCall(1000, this.resetPlayer, [], this);
+      }
     }
   }
 
   checkPlayerBulletCollision(bullet, enemy) {
-    return bullet.texture.key === 'mybullet';
+    return bullet.getData('isPlayerBullet'); // Comprobar si la bala es del jugador
   }
 
   checkEnemyBulletCollision(player, bullet) {
-    return bullet.texture.key === 'enemybullet';
+    return bullet.getData('isPlayerBullet'); // Comprobar si la bala es del jugador
   }
 
-  playerDestroyed() {
-    this.sprite.disableBody(true, true);
-    this.sprite.setPosition(400, 300);
-    this.lives = 3;
-    this.livesText.setText(`Lives: ${this.lives}`);
+  gameOver() {
+    this.gameOverText.setVisible(true);
+    this.restartText.setVisible(true);
+    this.bullets.clear(true, true);
+    this.enemies.children.each((enemy) => {
+      enemy.disableBody(true, true);
+    });
+    this.asteroids.children.each((asteroid) => {
+      asteroid.disableBody(true, true);
+    });
+  }
+
+  resetPlayer() {
+    this.sprite.enableBody(true, this.sprite.x, this.sprite.y, true, true);
+    this.sprite.setAcceleration(0);
+    this.sprite.setVelocity(0, 0);
+    this.sprite.setRotation(0);
+    this.sprite.setData('isDestroyed', false);
   }
 }
-
