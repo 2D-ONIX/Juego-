@@ -5,6 +5,8 @@ export default class Juego extends Phaser.Scene {
     super("hello-world");
   }
 
+  
+
   text;
   cursors;
   sprite;
@@ -23,6 +25,7 @@ export default class Juego extends Phaser.Scene {
   restartText;
 
   preload() {
+    this.load.image('fondo', 'public/assets/images/fondo.png');
     this.load.image('mybullet', 'public/assets/images/mybullet.png');
     this.load.image('enemybullet', 'public/assets/images/enemybullet.png');
     this.load.image('ship', 'public/assets/images/ship.png');
@@ -36,6 +39,9 @@ export default class Juego extends Phaser.Scene {
   }
 
   create() {
+    const fondo = this.add.image(400, 300, 'fondo');
+    fondo.setScale(800 / fondo.width, 600 / fondo.height);
+
     this.sprite = this.physics.add.image(400, 300, 'ship');
     this.sprite.setSize(30, 30);
 
