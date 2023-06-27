@@ -37,6 +37,7 @@ export default class Juego extends Phaser.Scene {
 
   create() {
     this.sprite = this.physics.add.image(400, 300, 'ship');
+    this.sprite.setSize(30, 30);
 
     this.sprite.setDamping(true);
     this.sprite.setDrag(0.99);
@@ -145,7 +146,7 @@ export default class Juego extends Phaser.Scene {
   
       // Asignar el evento de tiempo al enemigo
       enemy.setData('shootEvent', shootEvent);
-  
+      enemy.setSize(40, 40);
       this.enemyCount++;
     }
   }
@@ -202,6 +203,8 @@ export default class Juego extends Phaser.Scene {
       bullet.rotation = this.sprite.rotation;
       this.physics.velocityFromRotation(bullet.rotation, 200, bullet.body.velocity);
       bullet.setData('isPlayerBullet', true); // Asignar la propiedad 'isPlayerBullet' a true
+
+      bullet.setSize(20, 20);
     }
 
     if (!this.gameOverText.visible) {
@@ -211,7 +214,11 @@ export default class Juego extends Phaser.Scene {
       bullet.setData('isPlayerBullet', true); // Asignar la propiedad 'isPlayerBullet' a true
   
       this.laserSound.play(); // Reproducir el sonido "laser"
+
+      bullet.setSize(20, 20);
     }
+
+    
   }
 
   hitEnemy(bullet, enemy) {
