@@ -28,6 +28,11 @@ export default class Juego extends Phaser.Scene {
     this.load.image('ship', 'public/assets/images/ship.png');
     this.load.image('enemy', 'public/assets/images/enemy.png');
     this.load.image('asteroid', 'public/assets/images/asteroid.png');
+    this.load.audio('laserSound', 'public/assets/Sounds/laser.mp3');
+    this.load.audio('bombSound', 'public/assets/Sounds/bomb.mp3');
+    this.load.audio('winSound', 'public/assets/Sounds/win_loud.mp3');
+    this.load.audio('laserEnemy', 'public/assets/Sounds/laserenemy.mp3');
+    this.load.audio('music', 'public/assets/Sounds/music.mp3');
   }
 
   create() {
@@ -36,6 +41,14 @@ export default class Juego extends Phaser.Scene {
     this.sprite.setDamping(true);
     this.sprite.setDrag(0.99);
     this.sprite.setMaxVelocity(200);
+
+    this.laserSound = this.sound.add('laserSound');
+    this.bombSound = this.sound.add('bombSound');
+    this.winSound = this.sound.add('winSound');
+    this.laserEnemy = this.sound.add('laserEnemy');
+
+    this.music = this.sound.add('music', { loop: true });
+    this.music.play();
 
     this.cursors = this.input.keyboard.createCursorKeys();
     this.spaceKey = this.input.keyboard.addKey(Phaser.Input.Keyboard.KeyCodes.SPACE);
@@ -51,9 +64,10 @@ export default class Juego extends Phaser.Scene {
     this.asteroids = this.physics.add.group();
 
     this.enemyCount = 0;
+    this.destroyedEnemies = [];
     this.enemyTimer = this.time.addEvent({ delay: 10000, callback: this.spawnEnemy, callbackScope: this, repeat: 9 });
     this.time.addEvent({ delay: 5000, callback: this.spawnAsteroid, callbackScope: this, loop: true });
-    this.time.addEvent({ delay: 5000, callback: this.enemyShoot, callbackScope: this, loop: true });
+    
 
     this.physics.add.collider(this.bullets, this.enemies, this.hitEnemy, this.checkPlayerBulletCollision, this);
     this.physics.add.collider(this.bullets, this.asteroids, this.hitAsteroid, this.checkPlayerBulletCollision, this);
@@ -109,20 +123,30 @@ export default class Juego extends Phaser.Scene {
 
   spawnEnemy() {
     if (!this.gameOverText.visible && this.enemyCount < 10) {
-      const enemy = this.physics.add.sprite(Phaser.Math.Between(100, 700), -20, 'enemy');
-      this.enemies.add(enemy);
-      this.enemyCount++;
-
+      const enemy = this.enemies.create(Phaser.Math.Between(100, 700), -20, 'enemy');
+      enemy.setData('isDestroyed', false);
+  
       const randomAngle = Phaser.Math.FloatBetween(-Math.PI, Math.PI);
       enemy.rotation = randomAngle;
-
-      this.time.addEvent({
+  
+      // Configurar evento de tiempo para el disparo del enemigo
+      const shootEvent = this.time.addEvent({
         delay: Phaser.Math.Between(2000, 4000),
         callback: () => {
-          enemy.setVelocityY(100);
+          if (!enemy.getData('isDestroyed')) {
+            const bullet = this.bullets.create(enemy.x, enemy.y, 'enemybullet');
+            bullet.rotation = this.physics.accelerateToObject(bullet, this.sprite, 100);
+            this.physics.velocityFromRotation(bullet.rotation, 200, bullet.body.velocity);
+          }
         },
-        callbackScope: this
+        callbackScope: this,
+        loop: true
       });
+  
+      // Asignar el evento de tiempo al enemigo
+      enemy.setData('shootEvent', shootEvent);
+  
+      this.enemyCount++;
     }
   }
 
@@ -159,13 +183,17 @@ export default class Juego extends Phaser.Scene {
   }
 
   enemyShoot() {
-    this.enemies.children.each((enemy) => {
-      if (!enemy.getData('isDestroyed')) {
-        const bullet = this.bullets.create(enemy.x, enemy.y, 'enemybullet');
-        bullet.rotation = this.physics.accelerateToObject(bullet, this.sprite, 100);
-        this.physics.velocityFromRotation(bullet.rotation, 200, bullet.body.velocity);
-      }
-    });
+    if (!this.gameOverText.visible) {
+      this.enemies.children.each((enemy) => {
+        if (!enemy.getData('isDestroyed')) {
+          const bullet = this.bullets.create(enemy.x, enemy.y, 'enemybullet');
+          bullet.rotation = this.physics.accelerateToObject(bullet, this.sprite, 100);
+          this.physics.velocityFromRotation(bullet.rotation, 200, bullet.body.velocity);
+        }
+      });
+    }
+
+    this.laserEnemy.play();
   }
 
   playerShoot() {
@@ -175,37 +203,81 @@ export default class Juego extends Phaser.Scene {
       this.physics.velocityFromRotation(bullet.rotation, 200, bullet.body.velocity);
       bullet.setData('isPlayerBullet', true); // Asignar la propiedad 'isPlayerBullet' a true
     }
+
+    if (!this.gameOverText.visible) {
+      const bullet = this.bullets.create(this.sprite.x, this.sprite.y, 'mybullet');
+      bullet.rotation = this.sprite.rotation;
+      this.physics.velocityFromRotation(bullet.rotation, 200, bullet.body.velocity);
+      bullet.setData('isPlayerBullet', true); // Asignar la propiedad 'isPlayerBullet' a true
+  
+      this.laserSound.play(); // Reproducir el sonido "laser"
+    }
   }
 
   hitEnemy(bullet, enemy) {
     bullet.disableBody(true, true);
     enemy.disableBody(true, true);
+    enemy.setData('isDestroyed', true);
     this.enemyCount--;
-    this.points += 10;
+    this.points += 50;
     this.pointsText.setText(`Points: ${this.points}`);
+  
+    if (this.enemyCount === 0) {
+      this.enemyTimer.paused = true;
+    }
+  
+    this.bombSound.play(); // Reproducir el sonido "bomb"
+  
+    // Desactivar disparos del enemigo destruido
+    enemy.getData('shootEvent').remove(false);
+  
+    // Reaparecer el enemigo después de un retraso
+    this.time.addEvent({
+      delay: Phaser.Math.Between(5000, 10000),
+      callback: () => {
+        enemy.enableBody(true, enemy.x, -20, true, true);
+        enemy.setData('isDestroyed', false);
+        this.enemyCount++;
+        this.enemyTimer.paused = false;
+      },
+      callbackScope: this
+    });
   }
+  
 
   hitAsteroid(bullet, asteroid) {
     bullet.disableBody(true, true);
     asteroid.disableBody(true, true);
     this.points += 5;
     this.pointsText.setText(`Points: ${this.points}`);
+
+    this.bombSound.play(); // Reproducir el sonido "bomb"
   }
 
   hitEnemyPlayer(player, enemy) {
-    if (!player.getData('isDestroyed')) {
+    if (!this.sprite.getData('isDestroyed')) {
       enemy.disableBody(true, true);
-      player.setData('isDestroyed', true);
-      player.disableBody(true, true);
       this.lives--;
       this.livesText.setText(`Lives: ${this.lives}`);
-
-      if (this.lives === 0) {
-        this.gameOver();
+  
+      if (this.lives <= 0) {
+        this.playerDestroyed();
       } else {
-        this.time.delayedCall(1000, this.resetPlayer, [], this);
+        this.sprite.setData('isDestroyed', true);
+        this.sprite.setAlpha(0.5);
+  
+        this.time.addEvent({
+          delay: 3000,
+          callback: () => {
+            this.sprite.setData('isDestroyed', false);
+            this.sprite.setAlpha(1);
+          },
+          callbackScope: this
+        });
       }
     }
+
+    this.bombSound.play(); // Reproducir el sonido "bomb"
   }
 
   hitAsteroidPlayer(player, asteroid) {
@@ -222,6 +294,7 @@ export default class Juego extends Phaser.Scene {
         this.time.delayedCall(1000, this.resetPlayer, [], this);
       }
     }
+    this.bombSound.play(); // Reproducir el sonido "bomb"
   }
 
   hitPlayerBullet(player, bullet) {
@@ -238,6 +311,8 @@ export default class Juego extends Phaser.Scene {
         this.time.delayedCall(1000, this.resetPlayer, [], this);
       }
     }
+
+    this.bombSound.play(); // Reproducir el sonido "bomb"
   }
 
   checkPlayerBulletCollision(bullet, enemy) {
@@ -258,6 +333,14 @@ export default class Juego extends Phaser.Scene {
     this.asteroids.children.each((asteroid) => {
       asteroid.disableBody(true, true);
     });
+
+    this.destroyedEnemies.forEach((enemy) => {
+      enemy.destroy();
+    });
+    this.destroyedEnemies = [];
+
+    this.winSound.play();
+    this.music.stop();
   }
 
   resetPlayer() {
