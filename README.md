@@ -6,6 +6,6 @@ Controles:
 
 Se acelera con la flecha  ↑
 
-Se gira cno las flechas ← y →
+Se gira con las flechas ← y →
 
 Se dispara con espacio
