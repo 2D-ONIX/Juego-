@@ -2,27 +2,12 @@
 
 export default class Juego extends Phaser.Scene {
   constructor() {
-    super("hello-world");
+    super("Juego");
+
+    // Variables para controlar el estado del juego
+    this.gameStarted = false;
+    this.showTitleScreen = true;
   }
-
-  
-
-  text;
-  cursors;
-  sprite;
-  enemies;
-  bullets;
-  lives;
-  livesText;
-  points;
-  pointsText;
-  enemyCount;
-  enemyTimer;
-  spaceKey;
-  asteroids;
-  activeEnemiesText;
-  gameOverText;
-  restartText;
 
   preload() {
     this.load.image('fondo', 'public/assets/images/fondo.png');
@@ -39,6 +24,27 @@ export default class Juego extends Phaser.Scene {
   }
 
   create() {
+    if (this.showTitleScreen) {
+      const blackScreen = this.add.rectangle(400, 300, 800, 600, 0x000000);
+      blackScreen.setAlpha(0.8);
+
+      const playButton = this.add.rectangle(400, 300, 200, 80, 0x0000ff);
+      playButton.setInteractive();
+
+      const playText = this.add.text(380, 290, 'Play', { font: '32px Arial', fill: '#ffffff' });
+
+      playButton.on('pointerdown', () => {
+        this.startGame();
+      });
+    } else {
+      this.startGame();
+    }
+  }
+
+  startGame() {
+    this.gameStarted = true;
+    this.showTitleScreen = false;
+
     const fondo = this.add.image(400, 300, 'fondo');
     fondo.setScale(800 / fondo.width, 600 / fondo.height);
 
@@ -74,7 +80,6 @@ export default class Juego extends Phaser.Scene {
     this.destroyedEnemies = [];
     this.enemyTimer = this.time.addEvent({ delay: 10000, callback: this.spawnEnemy, callbackScope: this, repeat: 9 });
     this.time.addEvent({ delay: 5000, callback: this.spawnAsteroid, callbackScope: this, loop: true });
-    
 
     this.physics.add.collider(this.bullets, this.enemies, this.hitEnemy, this.checkPlayerBulletCollision, this);
     this.physics.add.collider(this.bullets, this.asteroids, this.hitAsteroid, this.checkPlayerBulletCollision, this);
@@ -98,49 +103,50 @@ export default class Juego extends Phaser.Scene {
   }
 
   update() {
-    if (!this.sprite.getData('isDestroyed')) {
-      if (this.cursors.up.isDown) {
-        this.physics.velocityFromRotation(this.sprite.rotation, 200, this.sprite.body.acceleration);
-      } else {
-        this.sprite.setAcceleration(0);
-      }
+    if (this.gameStarted) {
+      if (!this.sprite.getData('isDestroyed')) {
+        if (this.cursors.up.isDown) {
+          this.physics.velocityFromRotation(this.sprite.rotation, 200, this.sprite.body.acceleration);
+        } else {
+          this.sprite.setAcceleration(0);
+        }
 
-      if (this.cursors.left.isDown) {
-        this.sprite.setAngularVelocity(-300);
-      } else if (this.cursors.right.isDown) {
-        this.sprite.setAngularVelocity(300);
-      } else {
-        this.sprite.setAngularVelocity(0);
-      }
+        if (this.cursors.left.isDown) {
+          this.sprite.setAngularVelocity(-300);
+        } else if (this.cursors.right.isDown) {
+          this.sprite.setAngularVelocity(300);
+        } else {
+          this.sprite.setAngularVelocity(0);
+        }
 
-      this.text.setText(`Speed: ${this.sprite.body.speed}`);
+        this.text.setText(`Speed: ${this.sprite.body.speed}`);
 
-      this.physics.world.wrap(this.sprite, 32);
+        this.physics.world.wrap(this.sprite, 32);
 
-      this.enemies.children.each((enemy) => {
-        this.enemyMove(enemy);
-        this.physics.world.wrap(enemy, 16);
-      });
+        this.enemies.children.each((enemy) => {
+          this.enemyMove(enemy);
+          this.physics.world.wrap(enemy, 16);
+        });
 
-      if (Phaser.Input.Keyboard.JustDown(this.spaceKey)) {
-        this.playerShoot();
+        if (Phaser.Input.Keyboard.JustDown(this.spaceKey)) {
+          this.playerShoot();
+        }
       }
     }
   }
 
   spawnEnemy() {
-    if (!this.gameOverText.visible && this.enemyCount < 10) {
+    if (this.gameStarted && this.enemyCount < 10) {
       const enemy = this.enemies.create(Phaser.Math.Between(100, 700), -20, 'enemy');
       enemy.setData('isDestroyed', false);
-  
+
       const randomAngle = Phaser.Math.FloatBetween(-Math.PI, Math.PI);
       enemy.rotation = randomAngle;
-  
-      // Configurar evento de tiempo para el disparo del enemigo
+
       const shootEvent = this.time.addEvent({
         delay: Phaser.Math.Between(2000, 4000),
         callback: () => {
-          if (!enemy.getData('isDestroyed')) {
+          if (this.gameStarted && !enemy.getData('isDestroyed')) {
             const bullet = this.bullets.create(enemy.x, enemy.y, 'enemybullet');
             bullet.rotation = this.physics.accelerateToObject(bullet, this.sprite, 100);
             this.physics.velocityFromRotation(bullet.rotation, 200, bullet.body.velocity);
@@ -149,8 +155,7 @@ export default class Juego extends Phaser.Scene {
         callbackScope: this,
         loop: true
       });
-  
-      // Asignar el evento de tiempo al enemigo
+
       enemy.setData('shootEvent', shootEvent);
       enemy.setSize(40, 40);
       this.enemyCount++;
@@ -158,7 +163,7 @@ export default class Juego extends Phaser.Scene {
   }
 
   spawnAsteroid() {
-    if (!this.gameOverText.visible) {
+    if (this.gameStarted) {
       const x = Math.random() < 0.5 ? -20 : 820;
       const y = Phaser.Math.Between(100, 500);
       const asteroid = this.physics.add.sprite(x, y, 'asteroid');
@@ -190,7 +195,7 @@ export default class Juego extends Phaser.Scene {
   }
 
   enemyShoot() {
-    if (!this.gameOverText.visible) {
+    if (this.gameStarted) {
       this.enemies.children.each((enemy) => {
         if (!enemy.getData('isDestroyed')) {
           const bullet = this.bullets.create(enemy.x, enemy.y, 'enemybullet');
@@ -204,81 +209,71 @@ export default class Juego extends Phaser.Scene {
   }
 
   playerShoot() {
-    if (!this.gameOverText.visible) {
+    if (this.gameStarted) {
       const bullet = this.bullets.create(this.sprite.x, this.sprite.y, 'mybullet');
       bullet.rotation = this.sprite.rotation;
       this.physics.velocityFromRotation(bullet.rotation, 200, bullet.body.velocity);
-      bullet.setData('isPlayerBullet', true); // Asignar la propiedad 'isPlayerBullet' a true
+      bullet.setData('isPlayerBullet', true);
+
+      this.laserSound.play();
 
       bullet.setSize(20, 20);
     }
-
-    if (!this.gameOverText.visible) {
-      const bullet = this.bullets.create(this.sprite.x, this.sprite.y, 'mybullet');
-      bullet.rotation = this.sprite.rotation;
-      this.physics.velocityFromRotation(bullet.rotation, 200, bullet.body.velocity);
-      bullet.setData('isPlayerBullet', true); // Asignar la propiedad 'isPlayerBullet' a true
-  
-      this.laserSound.play(); // Reproducir el sonido "laser"
-
-      bullet.setSize(20, 20);
-    }
-
-    
   }
 
   hitEnemy(bullet, enemy) {
-    bullet.disableBody(true, true);
-    enemy.disableBody(true, true);
-    enemy.setData('isDestroyed', true);
-    this.enemyCount--;
-    this.points += 50;
-    this.pointsText.setText(`Points: ${this.points}`);
-  
-    if (this.enemyCount === 0) {
-      this.enemyTimer.paused = true;
+    if (this.gameStarted) {
+      bullet.disableBody(true, true);
+      enemy.disableBody(true, true);
+      enemy.setData('isDestroyed', true);
+      this.enemyCount--;
+      this.points += 50;
+      this.pointsText.setText(`Points: ${this.points}`);
+
+      if (this.enemyCount === 0) {
+        this.enemyTimer.paused = true;
+      }
+
+      this.bombSound.play();
+
+      enemy.getData('shootEvent').remove(false);
+
+      this.time.addEvent({
+        delay: Phaser.Math.Between(5000, 10000),
+        callback: () => {
+          enemy.enableBody(true, enemy.x, -20, true, true);
+          enemy.setData('isDestroyed', false);
+          this.enemyCount++;
+          this.enemyTimer.paused = false;
+        },
+        callbackScope: this
+      });
     }
-  
-    this.bombSound.play(); // Reproducir el sonido "bomb"
-  
-    // Desactivar disparos del enemigo destruido
-    enemy.getData('shootEvent').remove(false);
-  
-    // Reaparecer el enemigo después de un retraso
-    this.time.addEvent({
-      delay: Phaser.Math.Between(5000, 10000),
-      callback: () => {
-        enemy.enableBody(true, enemy.x, -20, true, true);
-        enemy.setData('isDestroyed', false);
-        this.enemyCount++;
-        this.enemyTimer.paused = false;
-      },
-      callbackScope: this
-    });
   }
-  
 
   hitAsteroid(bullet, asteroid) {
-    bullet.disableBody(true, true);
-    asteroid.disableBody(true, true);
-    this.points += 5;
-    this.pointsText.setText(`Points: ${this.points}`);
+    if (this.gameStarted) {
+      bullet.disableBody(true, true);
+      asteroid.disableBody(true, true);
+      this.points += 5;
+      this.pointsText.setText(`Points: ${this.points}`);
 
-    this.bombSound.play(); // Reproducir el sonido "bomb"
+      this.bombSound.play();
+    }
   }
 
   hitEnemyPlayer(player, enemy) {
-    if (!this.sprite.getData('isDestroyed')) {
+    if (this.gameStarted && !this.sprite.getData('isDestroyed')) {
       enemy.disableBody(true, true);
       this.lives--;
       this.livesText.setText(`Lives: ${this.lives}`);
-  
+
       if (this.lives <= 0) {
         this.playerDestroyed();
       } else {
         this.sprite.setData('isDestroyed', true);
         this.sprite.setAlpha(0.5);
-  
+
         this.time.addEvent({
           delay: 3000,
           callback: () => {
@@ -290,11 +285,11 @@ export default class Juego extends Phaser.Scene {
       }
     }
 
-    this.bombSound.play(); // Reproducir el sonido "bomb"
+    this.bombSound.play();
   }
 
   hitAsteroidPlayer(player, asteroid) {
-    if (!player.getData('isDestroyed')) {
+    if (this.gameStarted && !player.getData('isDestroyed')) {
       asteroid.disableBody(true, true);
       player.setData('isDestroyed', true);
       player.disableBody(true, true);
@@ -307,11 +302,11 @@ export default class Juego extends Phaser.Scene {
         this.time.delayedCall(1000, this.resetPlayer, [], this);
       }
     }
-    this.bombSound.play(); // Reproducir el sonido "bomb"
+    this.bombSound.play();
   }
 
   hitPlayerBullet(player, bullet) {
-    if (!player.getData('isDestroyed') && !bullet.getData('isPlayerBullet')) { // Comprobar que la bala no sea del jugador
+    if (this.gameStarted && !player.getData('isDestroyed') && !bullet.getData('isPlayerBullet')) {
       bullet.disableBody(true, true);
       player.setData('isDestroyed', true);
       player.disableBody(true, true);
@@ -325,15 +320,15 @@ export default class Juego extends Phaser.Scene {
       }
     }
 
-    this.bombSound.play(); // Reproducir el sonido "bomb"
+    this.bombSound.play();
   }
 
   checkPlayerBulletCollision(bullet, enemy) {
-    return bullet.getData('isPlayerBullet'); // Comprobar si la bala es del jugador
+    return bullet.getData('isPlayerBullet');
   }
 
   checkEnemyBulletCollision(player, bullet) {
-    return bullet.getData('isPlayerBullet'); // Comprobar si la bala es del jugador
+    return bullet.getData('isPlayerBullet');
   }
 
   gameOver() {
@@ -364,3 +359,4 @@ export default class Juego extends Phaser.Scene {
     this.sprite.setData('isDestroyed', false);
   }
 }
+
