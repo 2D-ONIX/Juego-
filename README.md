@@ -1,5 +1,11 @@
 # Phaser 3 Template
 
-Plantilla para iniciar nuevos proyectos con PHASER 3.
+Bienvenidos a Space Asteroids
 
-Contiene configuración inicial y buenas prácticas de estructuras de carpetas.
+Controles:
+
+Se acelera con la flecha  ↑
+
+Se gira cno las flechas ← y →
+
+Se dispara con espacio
